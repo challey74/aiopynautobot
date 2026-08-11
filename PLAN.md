@@ -8,9 +8,9 @@ that isn't Nautobot-specific; this plan is mostly about the deltas.
 Each phase has a success criterion. Phases 1 to 4 are the minimum for a usable
 0.1.0; 5 to 8 are what make it a peer of pynautobot.
 
-**Status as of 0.1.0: phases 0 to 6 and 8 are done; phase 7 is outstanding.**
-108 tests pass with ruff, ruff format, and pyright clean. The decisions the
-plan left open are recorded under Open questions at the bottom.
+**Status as of 0.1.0: all phases done.** 120 tests pass with ruff, ruff format,
+and pyright clean. The decisions the plan left open are recorded under Open
+questions at the bottom.
 
 ---
 
@@ -136,12 +136,20 @@ Port only the pynautobot model behaviors that are real behavior, not
 
 ---
 
-## Phase 7: typed endpoint hints (OUTSTANDING)
+## Phase 7: typed endpoint hints (done)
 
-`scripts/generate_endpoints.py` is written but **has never been run**, because
-generating needs an authenticated Nautobot. Nothing else in this phase exists:
-no `apps_generated.py`, no `hints_generated.pyi`, no regenerate workflow.
-Running it once against a container is the next concrete task.
+Generated from demo.nautobot.com (Nautobot 3.2.2, API version 3.2): 164
+endpoints across 13 apps, 2732 filter params. The demo does require
+authentication, but it publishes a documented read-only token, so it works as
+a generation source the same way demo.netbox.dev does for aiopynetbox, and the
+weekly workflow needs no secret.
+
+Three Nautobot-specific corrections the plan did not anticipate, all now
+covered by `tests/test_generated.py`:
+
+- Nautobot's schema paths omit the `/api` prefix (it lives in the document's `servers` entry), so aiopynetbox's `^/api/...` regex matched **zero** endpoints on the first run. The regex now treats the prefix as optional.
+- Generating revealed a `core` app that pynautobot does not expose and `Api` was missing entirely, so `nb.core` raised AttributeError. Now present.
+- The `create` fallback overload must return the base's `Record | list[Record]`. Narrowing it to `list[Devices]` made pyright reject every model-backed endpoint (34 errors), because `list` is invariant.
 
 
 `scripts/generate_endpoints.py` + `apps_generated.py` + `hints_generated.pyi`,
@@ -182,8 +190,10 @@ someone will otherwise re-litigate:
 4. **`__str__` prefers `display`**, matching pynautobot rather than aiopynetbox, because Nautobot populates it universally.
 5. **`run_and_wait` takes `timeout=` seconds, not pynautobot's `max_rechecks`**, and raises `JobTimeoutError` carrying the job result id rather than a bare `ValueError`.
 
+6. **Schema source: demo.nautobot.com with its documented read-only token.** Nautobot authenticates every route, but the demo's public token makes it usable without a CI secret. A pinned `ghcr.io/nautobot/nautobot-dev` container stays the fallback if the demo moves to a Nautobot major version this library does not support; the generator takes a URL and token for exactly that.
+
 Still open:
 
-6. **Test instance.** Phase 7 wants a containerized Nautobot; the same stack would enable pynautobot-style integration tests alongside the in-memory fake. Worth standing up once and reusing.
-7. **GitHub mirror timing.** Workflow files and `pyproject.toml` URLs already assume `challey74/aiopynautobot`. Until the mirror exists, CI does not run anywhere - a Forgejo Actions runner on ints.cc reading `.github/workflows/` would close that gap in the meantime.
-8. **GraphQL 200-with-errors.** Exposed as `result.errors` and documented, deliberately not raised, since partial data is often still useful. Revisit if it surprises people in practice.
+7. **Integration tests against a live Nautobot.** The demo covers schema generation, but every behavioral test still runs against the in-memory fake. A container would allow pynautobot-style integration tests; worth doing once there is a reason to distrust the fake.
+8. **GitHub mirror timing.** Workflow files and `pyproject.toml` URLs already assume `challey74/aiopynautobot`. Until the mirror exists, CI does not run anywhere - a Forgejo Actions runner on ints.cc reading `.github/workflows/` would close that gap in the meantime.
+9. **GraphQL 200-with-errors.** Exposed as `result.errors` and documented, deliberately not raised, since partial data is often still useful. Revisit if it surprises people in practice.

@@ -19,9 +19,9 @@ idiom rather than inventing new ones, and port fixes between the two.
 
 Package layout: `src/aiopynautobot/`, tests in `tests/`. Managed with `uv`.
 
-**Status: 0.1.0, feature-complete against pynautobot except generated endpoint
-hints.** [PLAN.md](PLAN.md) tracks the phases; phase 7 (typed hints) is the
-only one outstanding, and its open questions are still live.
+**Status: 0.1.0, feature-complete against pynautobot.** [PLAN.md](PLAN.md)
+tracks the phases; all of them are done, and the decisions they resolved are
+recorded at the bottom of that file.
 
 ## Commands
 
@@ -62,7 +62,7 @@ NetBox-specific and must **not** be carried over:
 - **`nbt_` v2 tokens / `Bearer` auth** - NetBox 4.5+ only. Nautobot uses `Authorization: Token <token>` unconditionally. There is also no `/users/tokens/provision/` equivalent to `Api.create_token()`.
 - **ETag optimistic locking** - `If-Match` / `If-None-Match` / 412 / 304 is NetBox 4.6+. Nautobot sends no `ETag` on detail responses (verified against demo.nautobot.com), so drop `_etag`, the conditional headers, and the 304 path.
 - **Cursor pagination** - the `start` cursor is NetBox 4.6+. Nautobot is limit/offset only. Concurrent offset fan-out still applies.
-- **`/api/schema/`** - Nautobot serves its OpenAPI document at `/api/swagger.json` (drf-spectacular, content type `application/vnd.oai.openapi+json`).
+- **`/api/schema/`** - Nautobot serves its OpenAPI document at `/api/swagger.json` (drf-spectacular, content type `application/vnd.oai.openapi+json`), and **requires a token to read it**, unlike demo.netbox.dev. Its schema paths also omit the `/api` prefix, which lives in the document's `servers` entry instead, so aiopynetbox's `^/api/...` list-path regex matches nothing here.
 
 And these are Nautobot-specific additions with no NetBox counterpart:
 
@@ -118,13 +118,32 @@ Key mechanics in `response.py`:
 - `Endpoint.choices()` caches on the Endpoint **instance**, and attribute access builds a fresh Endpoint each time, so the cache only helps when a reference is held. Tests assert both halves of that.
 - Job result status is a choice field, so `str(status)` gives the human label ("Pending"), not the Celery state ("PENDING"). `endpoint._status_value()` reads `.value`; never compare `str(status)` against the state constants.
 
+Typed endpoint hints live in [apps_generated.py](src/aiopynautobot/apps_generated.py)
+and [hints_generated.pyi](src/aiopynautobot/hints_generated.pyi) - both GENERATED
+by `scripts/generate_endpoints.py` from demo.nautobot.com's OpenAPI schema
+(the demo's documented read-only token is the script's default, since Nautobot
+authenticates every route), never edited by hand; a weekly workflow
+(regenerate-endpoints.yml) opens a PR on drift. The per-app subclasses hold bare
+class annotations (static analysis only, no runtime attributes); `App.__getattr__`
+remains the real mechanism, so unlisted endpoints still work. hints_generated.pyi
+is stub-only (never imported at runtime, hence pyright's reportMissingModuleSource
+is disabled): per-endpoint TypedDicts (values Any, name-completion only) feed
+Unpack overloads on filter/get/count/create, each with a `**kwargs: Any` fallback
+overload so cf_* filters, lookup expressions, and app params stay legal.
+
+Two traps when touching the generator, both covered by
+[tests/test_generated.py](tests/test_generated.py):
+
+- The `create` fallback overload must return `Record | list[Record]`, exactly the base signature. Narrowing it to `list[Devices]` makes pyright reject the whole override, because `list` is invariant.
+- `extras/jobs` and `extras/graphql_queries` are `JobsEndpoint`/`GraphqlEndpoint` at runtime, so their stubs must subclass the same (via the generator's `ENDPOINT_BASES`), or `run()` disappears from the hints.
+
 Tests run entirely against `FakeNautobot` in [tests/conftest.py](tests/conftest.py) -
 an in-memory Nautobot behind `httpx.MockTransport` (no network, no mocking
 library). Extend it when adding endpoints/behaviors.
 
-Not implemented yet (deliberately, add only when needed): generated endpoint
-hints (phase 7, blocked on a schema source), OpenAPI filter validation,
-file uploads (multipart).
+Not implemented yet (deliberately, add only when needed): OpenAPI filter
+validation, file uploads (multipart), integration tests against a live
+Nautobot.
 
 ## Conventions
 

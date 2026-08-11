@@ -26,6 +26,18 @@ an endpoint or behavior the fake doesn't model yet, extend the fake.
 
 New features and bug fixes should come with tests.
 
+## Generated files
+
+`src/aiopynautobot/apps_generated.py` and
+`src/aiopynautobot/hints_generated.pyi` are generated. Don't edit them by
+hand. To refresh the endpoint hints (e.g. after a Nautobot release), run
+`uv run python scripts/generate_endpoints.py` and commit the diff; a
+scheduled workflow also does this weekly against demo.nautobot.com.
+
+The generator defaults to the demo instance and its documented read-only
+token, because Nautobot requires authentication for every route including
+the OpenAPI schema. Pass a URL and token to point it elsewhere.
+
 ## Design constraints
 
 This library deliberately differs from pynautobot: all I/O is explicit and

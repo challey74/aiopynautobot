@@ -8,27 +8,25 @@ Outputs two files:
 
 Usage:
 
-    uv run python scripts/generate_endpoints.py <schema_url> [token]
+    uv run python scripts/generate_endpoints.py [schema_url] [token]
 
-Unlike NetBox's public demo, **every Nautobot instance requires
-authentication**, including demo.nautobot.com, so there is no anonymous
-default schema to fall back on. Point this at an instance you control:
+Defaults to the public demo instance, which runs a current Nautobot
+release. Unlike NetBox's demo, every Nautobot instance requires
+authentication even to read the schema, so the demo's documented
+read-only token is the default rather than sending no credentials.
+
+To generate against your own instance, or to pin a specific version with
+the throwaway container pynautobot's dev stack uses:
 
     uv run python scripts/generate_endpoints.py \\
         https://nautobot.example.com/api/swagger.json "$NAUTOBOT_TOKEN"
 
-The throwaway container pynautobot's dev stack uses works well and pins
-the version, which a shared demo instance does not:
-
     docker run -d -p 8080:8080 \\
         -e NAUTOBOT_SUPERUSER_API_TOKEN=0123456789abcdef0123456789abcdef01234567 \\
-        ghcr.io/nautobot/nautobot-dev:2.4
+        ghcr.io/nautobot/nautobot-dev:3.2
 
 The output is deterministic for a given schema, so rerunning without
 upstream changes produces no diff.
-
-NOTE: this script has not yet been run against a live Nautobot; the
-generated files are deliberately absent from 0.1.0. See PLAN.md phase 7.
 """
 
 from __future__ import annotations
@@ -42,12 +40,20 @@ from typing import Any
 
 import httpx
 
+DEFAULT_URL = "https://demo.nautobot.com/api/swagger.json"
+# The demo instance's documented public read-only token. Nautobot requires
+# authentication for every route, including the schema, so there is no
+# anonymous fallback the way demo.netbox.dev offers one.
+DEFAULT_TOKEN = "a" * 40
+
 SRC = Path(__file__).resolve().parent.parent / "src" / "aiopynautobot"
 
-# List-view paths only: /api/<app>/<endpoint>/. Detail and sub-routes
-# (/{id}/, /run/, ...) don't match. The app group allows dashes because
-# Nautobot has data-validation and load-balancers, which NetBox does not.
-LIST_PATH = re.compile(r"^/api/([a-z][a-z-]*)/([a-z0-9-]+)/$")
+# List-view paths only: <app>/<endpoint>/. Detail and sub-routes
+# (/{id}/, /notes/, /trace/, ...) don't match. Two Nautobot quirks versus
+# NetBox: the /api prefix lives in the schema's `servers` entry rather than
+# in each path, so it is optional here; and the app group allows dashes
+# because of data-validation and load-balancers.
+LIST_PATH = re.compile(r"^(?:/api)?/([a-z][a-z-]*)/([a-z0-9-]+)/$")
 
 # Real attributes on App that an endpoint annotation must never shadow.
 RESERVED = {"name", "endpoint", "choices", "config"}
@@ -57,6 +63,13 @@ RESERVED = {"name", "endpoint", "choices", "config"}
 # (name__ic, id__gt...) fall through to the Any-kwargs overload rather
 # than multiplying the hint size.
 PARAM_EXCLUDE = {"limit", "offset", "format", "exclude_m2m", "include", "depth"}
+
+# Endpoints whose runtime Endpoint is a subclass (see app.SPECIAL_ENDPOINTS);
+# the stub must match or run() disappears from the hints.
+ENDPOINT_BASES = {
+    ("extras", "jobs"): "JobsEndpoint",
+    ("extras", "graphql_queries"): "GraphqlEndpoint",
+}
 
 # Endpoints whose records are model subclasses; hints return those types
 # so their helpers (available_ips, trace, napalm, ...) type-check.
@@ -136,8 +149,8 @@ and the trailing **kwargs: Any overloads keep custom-field filters
 
 from typing import Any, TypedDict, Unpack, overload
 
-from aiopynautobot.endpoint import Endpoint
-from aiopynautobot.models import *  # noqa: F403
+from aiopynautobot.endpoint import Endpoint, GraphqlEndpoint, JobsEndpoint
+from aiopynautobot.models import *
 from aiopynautobot.response import Record, RecordSet
 '''
 
@@ -189,6 +202,7 @@ def endpoint_stub(app: str, attr: str, filters: list[str], fields: list[str]) ->
     """One endpoint's TypedDicts + Endpoint subclass for hints_generated.pyi."""
     cls = f"{app_class_name(app)}{pascal(attr)}"
     record = MODEL_RETURNS.get((app, attr), "Record")
+    base = ENDPOINT_BASES.get((app, attr), "Endpoint")
     out: list[str] = []
     if filters:
         out.append(f"class {cls}Filters(TypedDict, total=False):")
@@ -198,7 +212,7 @@ def endpoint_stub(app: str, attr: str, filters: list[str], fields: list[str]) ->
         out.append(f"class {cls}Fields(TypedDict, total=False):")
         out += [f"    {name}: Any" for name in fields]
         out.append("")
-    out.append(f"class {cls}Endpoint(Endpoint):")
+    out.append(f"class {cls}Endpoint({base}):")
     if filters:
         out += [
             "    @overload",
@@ -224,10 +238,14 @@ def endpoint_stub(app: str, attr: str, filters: list[str], fields: list[str]) ->
             f"    async def create(self, **fields: Unpack[{cls}Fields]) -> {record}: ...",
             "    @overload",
             f"    async def create(self, objects: list[dict[str, Any]], /) -> list[{record}]: ...",
+            # The fallback overload must match Endpoint.create exactly,
+            # including its return type: list is invariant, so a narrowed
+            # list[Devices] is not assignable to the base's list[Record]
+            # and pyright would reject the whole override.
             "    @overload",
             "    async def create(",
             "        self, *args: dict[str, Any] | list[dict[str, Any]], **kwargs: Any",
-            f"    ) -> {record} | list[{record}]: ...",
+            "    ) -> Record | list[Record]: ...",
         ]
     if not filters and not fields:
         out.append("    ...")
@@ -235,18 +253,10 @@ def endpoint_stub(app: str, attr: str, filters: list[str], fields: list[str]) ->
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        sys.exit(
-            "usage: generate_endpoints.py <schema_url> [token]\n"
-            "Nautobot always requires authentication, so a token is needed "
-            "unless the instance is unauthenticated."
-        )
-    url = sys.argv[1]
-    token = sys.argv[2] if len(sys.argv) > 2 else None
-    headers = {"Accept": "application/json"}
-    if token:
-        headers["Authorization"] = f"Token {token}"
-    resp = httpx.get(url, headers=headers, follow_redirects=True, timeout=120)
+    url = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_URL
+    token = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_TOKEN
+    headers = {"Accept": "application/json", "Authorization": f"Token {token}"}
+    resp = httpx.get(url, headers=headers, follow_redirects=True, timeout=300)
     resp.raise_for_status()
     spec = resp.json()
     components = spec.get("components", {}).get("schemas", {})

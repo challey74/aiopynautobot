@@ -69,15 +69,13 @@ Initial release. Requires Nautobot 2.4+.
 - `Api.status()` and `Api.openapi()` (from `/api/swagger.json`, cached);
   `Api.version()` reads the `API-Version` header and tolerates the 403
   that instances with LOGIN_REQUIRED return.
-- Full type hints with a `py.typed` marker.
+- Full type hints with a `py.typed` marker, plus generated hints so IDEs
+  autocomplete endpoint names and per-endpoint kwargs for `filter()` /
+  `get()` / `count()` / `create()`. Hints never restrict runtime
+  behavior; they regenerate weekly from demo.nautobot.com's OpenAPI
+  schema. Covers 164 endpoints across 13 apps at Nautobot 3.2.
+- `nb.core`, which pynautobot does not expose.
 - A runnable FastAPI example (`examples/fastapi_app.py`) showing the
   app-state / lifespan usage pattern.
-
-### Deferred
-
-- Generated endpoint hints. Nautobot requires authentication for its
-  OpenAPI schema, so generation needs a token or a throwaway container
-  rather than a public demo instance. `scripts/generate_endpoints.py` is
-  written but has not been run; see PLAN.md phase 7.
 
 [0.1.0]: https://github.com/challey74/aiopynautobot/releases/tag/v0.1.0

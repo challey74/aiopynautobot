@@ -10,7 +10,22 @@ from typing import Any, Self
 
 import httpx
 
-from aiopynautobot.app import App, PluginsApp
+from aiopynautobot.app import PluginsApp
+from aiopynautobot.apps_generated import (
+    CircuitsApp,
+    CloudApp,
+    CoreApp,
+    DataValidationApp,
+    DcimApp,
+    ExtrasApp,
+    IpamApp,
+    LoadBalancersApp,
+    TenancyApp,
+    UsersApp,
+    VirtualizationApp,
+    VpnApp,
+    WirelessApp,
+)
 from aiopynautobot.exceptions import AllocationError, ContentError, RequestError
 from aiopynautobot.graphql import GraphQLQuery
 
@@ -89,19 +104,20 @@ class Api:
             else httpx.AsyncClient(timeout=timeout, follow_redirects=True)
         )
 
-        self.circuits = App(self, "circuits")
-        self.cloud = App(self, "cloud")
-        self.data_validation = App(self, "data-validation")
-        self.dcim = App(self, "dcim")
-        self.extras = App(self, "extras")
-        self.ipam = App(self, "ipam")
-        self.load_balancers = App(self, "load-balancers")
+        self.circuits = CircuitsApp(self, "circuits")
+        self.cloud = CloudApp(self, "cloud")
+        self.core = CoreApp(self, "core")
+        self.data_validation = DataValidationApp(self, "data-validation")
+        self.dcim = DcimApp(self, "dcim")
+        self.extras = ExtrasApp(self, "extras")
+        self.ipam = IpamApp(self, "ipam")
+        self.load_balancers = LoadBalancersApp(self, "load-balancers")
         self.plugins = PluginsApp(self)
-        self.tenancy = App(self, "tenancy")
-        self.users = App(self, "users")
-        self.virtualization = App(self, "virtualization")
-        self.vpn = App(self, "vpn")
-        self.wireless = App(self, "wireless")
+        self.tenancy = TenancyApp(self, "tenancy")
+        self.users = UsersApp(self, "users")
+        self.virtualization = VirtualizationApp(self, "virtualization")
+        self.vpn = VpnApp(self, "vpn")
+        self.wireless = WirelessApp(self, "wireless")
         self.graphql = GraphQLQuery(self)
 
     async def __aenter__(self) -> Self:

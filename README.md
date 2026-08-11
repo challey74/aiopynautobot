@@ -112,7 +112,11 @@ that isn't loaded raises `AttributeError` telling you to
   BgpSession)` maps app endpoints to your own Record subclasses;
   `app.endpoint("literal_name")` reaches endpoint slugs that contain
   real underscores.
-- **Typed**: full type hints and a `py.typed` marker.
+- **Typed**: full type hints and a `py.typed` marker, plus generated
+  hints so IDEs autocomplete endpoint names (`nb.dcim.devices`) and
+  per-endpoint kwargs (`filter(name=...)`, `create(device_type=...)`).
+  Hints never restrict anything at runtime: unknown endpoints, lookup
+  expressions, and custom-field filters keep working.
 
 ## API tour
 
@@ -195,16 +199,6 @@ Response caching is deliberately not built in: Nautobot is a source of
 truth, and the library can't know your staleness tolerance. If you want
 HTTP caching, pass a client using [hishel](https://hishel.com/)'s
 `AsyncCacheTransport` and set the policy yourself.
-
-## Not implemented yet
-
-Generated endpoint hints (the IDE autocomplete for endpoint names and
-per-endpoint kwargs that aiopynetbox ships) are deferred: every Nautobot
-instance requires authentication for its OpenAPI schema, so generation
-needs a token or a throwaway container rather than a public demo. The
-generator lives at
-[scripts/generate_endpoints.py](scripts/generate_endpoints.py); see
-[PLAN.md](PLAN.md) phase 7.
 
 ## Development
 
