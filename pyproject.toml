@@ -11,12 +11,13 @@ license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 keywords = ["nautobot", "async", "asyncio", "httpx", "api", "client", "ipam", "dcim"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Framework :: AsyncIO",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Telecommunications Industry",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -29,6 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/challey74/aiopynautobot"
 Repository = "https://github.com/challey74/aiopynautobot"
 Changelog = "https://github.com/challey74/aiopynautobot/blob/main/CHANGELOG.md"
 Issues = "https://github.com/challey74/aiopynautobot/issues"
@@ -36,6 +38,10 @@ Issues = "https://github.com/challey74/aiopynautobot/issues"
 [build-system]
 requires = ["uv_build>=0.11.31,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Ship tests and the changelog in the sdist for distro packagers.
+source-include = ["tests/**", "CHANGELOG.md"]
 
 [dependency-groups]
 dev = [

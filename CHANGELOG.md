@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-08-11
+## [0.1.0] - 2026-08-13
 
 Initial release. Requires Nautobot 2.4+.
 
@@ -30,11 +30,13 @@ Initial release. Requires Nautobot 2.4+.
   slugs. Plus `nb.plugins.<app>.<endpoint>`,
   `nb.plugins.installed_plugins()`, and `App.endpoint(name)` for slugs
   with literal underscores.
-- App-level helpers: `app.choices()`, `app.config()`,
-  `app.get_custom_fields()`, `app.get_custom_field_choices()`.
+- App-level helpers: `app.config()`, `app.get_custom_fields()`, and
+  `app.get_custom_field_choices()`, the latter two draining every page.
 - `get()` / `filter()` / `all()` / `count()` / `create()` on endpoints;
-  result sets are lazy async iterators with concurrent page fetching
-  bounded by `max_concurrency`. Primary keys are UUID strings.
+  result sets are lazy async iterators that fetch pages through a sliding
+  window bounded by `max_concurrency`, so breaking out of an iteration
+  early stops the fetching. Primary keys are UUID strings, and key path
+  segments are percent-encoded.
 - `Endpoint.choices()` from OPTIONS metadata, handling both plain choice
   fields and list fields whose choices live under `child`.
 - Diff-based `Record.save()` (PATCHes only changed fields, with
@@ -51,7 +53,7 @@ Initial release. Requires Nautobot 2.4+.
 - Cable tracing via `await record.trace()` on interfaces, front/rear
   ports, power outlets/ports, console (server) ports, and cables.
 - `record.notes` on every Record, plus read-only `device.napalm` and
-  `rack.units` / `rack.elevation`.
+  `rack.elevation`.
 - GraphQL support: `await nb.graphql.query(query, variables)` returning a
   `GraphQLRecord`, raising `GraphQLError` with the parsed `errors` array
   on an invalid query. Saved queries run via
@@ -78,4 +80,5 @@ Initial release. Requires Nautobot 2.4+.
 - A runnable FastAPI example (`examples/fastapi_app.py`) showing the
   app-state / lifespan usage pattern.
 
+[unreleased]: https://github.com/challey74/aiopynautobot/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/challey74/aiopynautobot/releases/tag/v0.1.0

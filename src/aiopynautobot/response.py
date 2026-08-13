@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import itertools
+from collections import deque
 from collections.abc import AsyncGenerator, Iterator
 from typing import TYPE_CHECKING, Any
 
@@ -73,7 +75,15 @@ class Record:
                 v = Record(v, self._api)
             elif isinstance(v, list) and k not in self.JSON_FIELDS:
                 v = [Record(i, self._api) if isinstance(i, dict) else i for i in v]
-            setattr(self, k, v)
+            try:
+                setattr(self, k, v)
+            except AttributeError as e:
+                # Properties (notes, napalm, elevation, ...) have no setter,
+                # and the raw error names neither the field nor the class.
+                raise AttributeError(
+                    f"{type(self).__name__} cannot store the field {k!r}: it "
+                    "collides with a property of the same name."
+                ) from e
 
     def __getattr__(self, k: str) -> Any:
         if k.startswith("_"):
@@ -304,31 +314,43 @@ class RecordSet:
             for item in data:
                 yield record_class(item, api, full=True)
             return
+        if "results" not in data:
+            # A detail route can answer with a single object instead of a
+            # page (e.g. device napalm).
+            yield record_class(data, api, full=True)
+            return
         results = data["results"]
         for item in results:
             yield record_class(item, api, full=True)
-        if self.offset is not None or not data.get("next") or not results:
+        # An explicit offset, whether from the constructor or the filters,
+        # pins the query to that one page.
+        if "offset" in params or not data.get("next") or not results:
             return
         page_size = len(results)
-        sem = asyncio.Semaphore(api.max_concurrency)
 
         async def fetch(offset: int) -> Any:
-            async with sem:
-                page_params = dict(params)
-                page_params.update(limit=page_size, offset=offset)
-                return await api._request("GET", self.endpoint.url, params=page_params)
+            page_params = dict(params)
+            page_params.update(limit=page_size, offset=offset)
+            return await api._request("GET", self.endpoint.url, params=page_params)
 
-        tasks = [
+        # Sliding window: at most max_concurrency page fetches are in flight,
+        # so abandoning the iteration early neither fetches nor buffers the
+        # rest of the pages.
+        offsets = iter(range(page_size, data["count"], page_size))
+        window: deque[asyncio.Task[Any]] = deque(
             asyncio.create_task(fetch(offset))
-            for offset in range(page_size, data["count"], page_size)
-        ]
+            for offset in itertools.islice(offsets, api.max_concurrency)
+        )
         try:
-            for task in tasks:
-                page = await task
+            while window:
+                page = await window.popleft()
+                next_offset = next(offsets, None)
+                if next_offset is not None:
+                    window.append(asyncio.create_task(fetch(next_offset)))
                 for item in page["results"]:
                     yield record_class(item, api, full=True)
         finally:
-            for task in tasks:
+            for task in window:
                 task.cancel()
 
     async def count(self) -> int:
@@ -339,6 +361,9 @@ class RecordSet:
         if isinstance(data, list):
             # Non-paginated detail routes return the full list regardless.
             return len(data)
+        if "results" not in data:
+            # A detail route answering with a single object.
+            return 1
         return data["count"]
 
     async def update(self, **kwargs: Any) -> list[Record]:

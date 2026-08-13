@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 from aiopynautobot.exceptions import JobTimeoutError, RequestError
 from aiopynautobot.models import ENDPOINT_MODELS
@@ -25,6 +26,15 @@ def _status_value(status: Any) -> str:
     ("PENDING"). Prefer `value` and fall back for plain-string payloads.
     """
     return str(getattr(status, "value", status) or "")
+
+
+def _segment(value: Any) -> str:
+    """Percent-encode a value used as a URL path segment.
+
+    Slashes and `&` stay literal: job class paths contain slashes and
+    composite natural keys join their parts with `&`.
+    """
+    return quote(str(value), safe="/&")
 
 
 class Endpoint:
@@ -56,7 +66,7 @@ class Endpoint:
         """
         if pk is not None:
             try:
-                data = await self.api._request("GET", f"{self.url}{pk}/")
+                data = await self.api._request("GET", f"{self.url}{_segment(pk)}/")
             except RequestError as e:
                 if e.status_code == 404:
                     return None
@@ -200,7 +210,9 @@ class JobsEndpoint(Endpoint):
         job = job_id or job_name
         if not job:
             raise ValueError("Either job_id or job_name is required to run a job.")
-        data = await self.api._request("POST", f"{self.url}{job}/run/", json=kwargs)
+        data = await self.api._request(
+            "POST", f"{self.url}{_segment(job)}/run/", json=kwargs
+        )
         return self.record_class(data, self.api, full=True)
 
     async def run_and_wait(
@@ -230,6 +242,7 @@ class JobsEndpoint(Endpoint):
             JobTimeoutError: If the job is still active after `timeout`.
                 The job itself keeps running; the error carries the job
                 result id so it can be polled further.
+            RuntimeError: If the job result carries no url to poll.
         """
         if interval <= 0:
             raise ValueError("interval must be positive")
@@ -239,7 +252,12 @@ class JobsEndpoint(Endpoint):
             async with asyncio.timeout(timeout):
                 while _status_value(result.status) in ACTIVE_JOB_STATUSES:
                     await asyncio.sleep(interval)
-                    await result.full_details()
+                    if not await result.full_details():
+                        raise RuntimeError(
+                            "The job result has no url to poll, so its status "
+                            "can never be refreshed; run() the job and poll it "
+                            "yourself."
+                        )
         except TimeoutError:
             raise JobTimeoutError(getattr(result, "id", None), timeout) from None
         return job
@@ -252,6 +270,6 @@ class GraphqlEndpoint(Endpoint):
         """Execute a saved GraphQL query by id."""
         payload: dict[str, Any] = {"variables": variables} if variables else {}
         data = await self.api._request(
-            "POST", f"{self.url}{query_id}/run/", json=payload
+            "POST", f"{self.url}{_segment(query_id)}/run/", json=payload
         )
         return self.record_class(data, self.api, full=True)

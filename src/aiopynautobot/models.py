@@ -207,15 +207,15 @@ class ControllerManagedDeviceGroups(Record):
 
 
 class RackUnits(Record):
-    """A single rack unit, as returned by racks/<id>/units|elevation."""
+    """A single rack unit, as returned by racks/<id>/elevation."""
 
 
 class Racks(Record):
-    """dcim/racks record with unit and elevation views."""
+    """dcim/racks record with an elevation view.
 
-    @property
-    def units(self) -> RODetailEndpoint:
-        return RODetailEndpoint(self, "units", record_class=RackUnits)
+    pynautobot's `units` view is not carried over: the /units/ route is
+    gone in Nautobot 3.x (404), /elevation/ replaces it.
+    """
 
     @property
     def elevation(self) -> RODetailEndpoint:

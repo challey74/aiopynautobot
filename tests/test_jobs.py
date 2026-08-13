@@ -24,7 +24,10 @@ async def test_run_accepts_job_name(nb, fake):
         # The fake only routes the UUID form; this asserts the name is
         # what lands in the URL.
         await nb.extras.jobs.run(job_name="Verify Hostnames")
-    assert fake.requests[-1].url.path == "/api/extras/jobs/Verify Hostnames/run/"
+    request = fake.requests[-1]
+    assert request.url.path == "/api/extras/jobs/Verify Hostnames/run/"
+    # The space is percent-encoded on the wire.
+    assert request.url.raw_path == b"/api/extras/jobs/Verify%20Hostnames/run/"
 
 
 async def test_run_requires_a_job_identifier(nb):
@@ -64,6 +67,24 @@ async def test_run_and_wait_skips_polling_when_already_terminal(fake):
         for r in fake.requests
         if r.url.path == f"/api/extras/job-results/{JOB_RESULT_ID}/"
     ]
+
+
+async def test_run_and_wait_rejects_an_unpollable_job_result(fake):
+    """A job result without a url can never change status."""
+    real_handler = fake.handler
+
+    def no_url(request):
+        response = real_handler(request)
+        if request.url.path.endswith("/run/"):
+            body = response.json()
+            del body["job_result"]["url"]
+            return httpx.Response(201, json=body)
+        return response
+
+    fake.handler = no_url
+    async with make_api(fake) as nb:
+        with pytest.raises(RuntimeError, match="no url to poll"):
+            await nb.extras.jobs.run_and_wait(job_id=JOB_ID, interval=TICK)
 
 
 async def test_run_and_wait_times_out(nb, fake):

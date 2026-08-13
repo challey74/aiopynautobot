@@ -46,7 +46,7 @@ async def version() -> dict[str, str]:
 async def devices(location: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     nb = app.state.nb
     query = (
-        nb.dcim.devices.filter(location=location)
+        nb.dcim.devices.filter(location=location, limit=limit)
         if location
         else nb.dcim.devices.all(limit=limit)
     )

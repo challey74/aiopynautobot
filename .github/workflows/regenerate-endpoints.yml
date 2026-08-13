@@ -1,4 +1,4 @@
-name: Regenerate endpoints
+﻿name: Regenerate endpoints
 
 on:
   schedule:
@@ -13,10 +13,14 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10
       - run: uv sync --frozen
       - run: uv run python scripts/generate_endpoints.py
       - run: uv run ruff format src/aiopynautobot/apps_generated.py src/aiopynautobot/hints_generated.pyi
+      # PRs opened with GITHUB_TOKEN don't trigger the CI workflow, so run
+      # the full check suite here before opening one.
+      - run: uv run ruff check
+      - run: uv run ruff format --check
       - run: uv run pyright
       - run: uv run pytest
       - uses: peter-evans/create-pull-request@v8

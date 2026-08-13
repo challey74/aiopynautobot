@@ -1,7 +1,7 @@
 # aiopynautobot
 
 [![CI](https://github.com/challey74/aiopynautobot/actions/workflows/ci.yml/badge.svg)](https://github.com/challey74/aiopynautobot/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/challey74/aiopynautobot/blob/main/LICENSE)
 
 Fully async Nautobot API client for Python, built on
 [httpx](https://www.python-httpx.org/).
@@ -92,8 +92,9 @@ that isn't loaded raises `AttributeError` telling you to
   `await nb.dcim.devices.filter(status="offline").update(comments="audit")`,
   `await recordset.delete()`, and list forms on the endpoint
   (`endpoint.update([...])` / `endpoint.delete([...])`).
-- **IPAM allocation**: `await prefix.available_ips.create()` / `.list()`,
-  plus `available_prefixes`. An exhausted pool raises `AllocationError`
+- **IPAM allocation**: `await prefix.available_ips.create()` to allocate,
+  `async for ip in prefix.available_ips.list()` to browse, plus
+  `available_prefixes`. An exhausted pool raises `AllocationError`
   (Nautobot answers 204 No Content, not NetBox's 409).
 - **Cable tracing**: `await interface.trace()` returns
   `[termination_a, cable, termination_b]` hops, with `None` where a path is
@@ -178,7 +179,8 @@ async def lifespan(app: FastAPI):
 ```
 
 One shared instance is safe under concurrent requests. See
-[examples/fastapi_app.py](examples/fastapi_app.py) for a runnable app.
+[examples/fastapi_app.py](https://github.com/challey74/aiopynautobot/blob/main/examples/fastapi_app.py)
+for a runnable app.
 
 ### Custom httpx client
 
@@ -212,8 +214,10 @@ uv run ruff format   # format
 uv run pyright       # type check
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/challey74/aiopynautobot/blob/main/CONTRIBUTING.md).
 
 ## License
 
-Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Apache 2.0, see
+[LICENSE](https://github.com/challey74/aiopynautobot/blob/main/LICENSE) and
+[NOTICE](https://github.com/challey74/aiopynautobot/blob/main/NOTICE).

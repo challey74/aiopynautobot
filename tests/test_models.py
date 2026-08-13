@@ -53,13 +53,18 @@ async def test_allocation_error_on_204(nb):
         await prefix.available_ips.create([{}, {}, {}, {}])
 
 
-async def test_rack_units_is_read_only(nb):
+async def test_rack_elevation_is_read_only(nb):
     rack = await nb.dcim.racks.get(RACK_ID)
-    units = [u async for u in rack.units.list()]
+    units = [u async for u in rack.elevation.list()]
     assert isinstance(units[0], RackUnits)
-    assert isinstance(rack.units, RODetailEndpoint)
+    assert isinstance(rack.elevation, RODetailEndpoint)
     with pytest.raises(NotImplementedError):
-        await rack.units.create({})
+        await rack.elevation.create({})
+
+
+def test_rack_units_view_is_gone():
+    """The /units/ route 404s on Nautobot 3.x; /elevation/ replaced it."""
+    assert not hasattr(Racks, "units")
 
 
 async def test_device_napalm_is_read_only(nb):
@@ -67,6 +72,16 @@ async def test_device_napalm_is_read_only(nb):
     assert isinstance(device.napalm, RODetailEndpoint)
     with pytest.raises(NotImplementedError):
         await device.napalm.create({})
+
+
+async def test_detail_route_returning_a_plain_object(nb):
+    """napalm answers with one object, not a paginated envelope."""
+    device = await nb.dcim.devices.get(DEVICE_IDS[0])
+    recordset = device.napalm.list(method="get_facts")
+    facts = [f async for f in recordset]
+    assert len(facts) == 1
+    assert facts[0].get_facts["hostname"] == "sw-1"
+    assert await recordset.count() == 1
 
 
 async def test_notes_on_any_record(nb):

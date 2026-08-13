@@ -37,36 +37,40 @@ class App:
         conversion), for plugin endpoints with literal underscores."""
         return Endpoint(self._api, self, name, literal_name=True)
 
-    async def choices(self) -> dict[str, Any]:
-        """The app-wide `_choices` payload."""
-        return await self._api._request(
-            "GET", f"{self._api.base_url}/{self.name}/_choices/"
-        )
-
     async def config(self) -> dict[str, Any]:
         """The app's `config` payload (e.g. nb.users.config())."""
         return await self._api._request(
             "GET", f"{self._api.base_url}/{self.name}/config/"
         )
 
+    async def _drain(
+        self, url: str, filters: dict[str, Any] | None
+    ) -> list[dict[str, Any]]:
+        """Concatenate every page of a paginated list route."""
+        results: list[dict[str, Any]] = []
+        params = filters
+        while url:
+            data = await self._api._request("GET", url, params=params)
+            results.extend(data["results"])
+            url = data.get("next")
+            # The `next` link already carries the query string.
+            params = None
+        return results
+
     async def get_custom_fields(
         self, filters: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Raw custom-field definitions for this app."""
-        return await self._api._request(
-            "GET",
-            f"{self._api.base_url}/{self.name}/custom-fields/",
-            params=filters,
+        """Raw custom-field definitions for this app, across all pages."""
+        return await self._drain(
+            f"{self._api.base_url}/{self.name}/custom-fields/", filters
         )
 
     async def get_custom_field_choices(
         self, filters: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        """Raw custom-field choice definitions for this app."""
-        return await self._api._request(
-            "GET",
-            f"{self._api.base_url}/{self.name}/custom-field-choices/",
-            params=filters,
+        """Raw custom-field choice definitions for this app, across all pages."""
+        return await self._drain(
+            f"{self._api.base_url}/{self.name}/custom-field-choices/", filters
         )
 
 

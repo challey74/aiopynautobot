@@ -54,7 +54,8 @@ NetBox-only parts.
 - Apps on `Api`: `circuits`, `cloud`, `data_validation` (`data-validation`), `dcim`, `extras`, `ipam`, `tenancy`, `users`, `virtualization`, `vpn`, `wireless`, plus `plugins`. Note the two dashed app names.
 - `PluginsApp` routes `nb.plugins.<plugin>.<endpoint>` into `/api/plugins/<plugin>/`; `await nb.plugins.installed_plugins()`.
 - App-level helpers pynautobot has and aiopynetbox does not, all `async`:
-  `await app.choices()` (`/<app>/_choices/`), `await app.get_custom_fields(filters=None)`,
+  `await app.get_custom_fields(filters=None)`
+  (`app.choices()` was planned here but dropped: `/<app>/_choices/` 404s on Nautobot 3.x),
   `await app.get_custom_field_choices(filters=None)`, `await app.config()`.
 - `Endpoint`: `get(pk=None, /, **kwargs)`, `filter(**kwargs)`, `all(limit=0, offset=None)`, `count(**kwargs)`, `create(...)`, `update(list)`, `delete(list)`, `choices()`.
   - `get()` takes a **UUID string**. Nothing may assume `int` ids.
@@ -93,7 +94,7 @@ Port only the pynautobot model behaviors that are real behavior, not
 `__str__` sugar, first:
 
 - `ipam/prefixes` -> `available_ips`, `available_prefixes` (`DetailEndpoint`).
-- `dcim/racks` -> `units`, `elevation` (read-only detail endpoints).
+- `dcim/racks` -> `elevation` (read-only detail endpoint; `units` was planned but 404s on Nautobot 3.x, so it was dropped).
 - `dcim/devices` -> `napalm` (read-only). Confirm Nautobot still ships the napalm REST endpoint at the target version before porting it; NetBox dropped its equivalent and aiopynautobot should not carry a dead route.
 - `extras/dynamic-groups` -> `members`.
 - `extras/jobs` -> see Phase 6.
@@ -112,7 +113,7 @@ Port only the pynautobot model behaviors that are real behavior, not
 `core/graphql.py`.
 
 - `await nb.graphql.query(query: str, variables: dict | None = None) -> GraphQLRecord` POSTs `{"query": ..., "variables": ...}` to `/api/graphql/`.
-- `GraphQLException` carries `errors`, `status_code`, `url`, and the request body. Raise it on 400 (Nautobot's shape for an invalid query); let other statuses surface as `RequestError`.
+- `GraphQLError` (shipped name; the plan originally said GraphQLException) carries `errors`, `status_code`, and `url`. Raise it on 400 (Nautobot's shape for an invalid query); let other statuses surface as `RequestError`.
 - Type-check `query` (str) and `variables` (dict) before sending, as pynautobot does - it turns a common mistake into a clear `TypeError` instead of a server-side parse error.
 - Saved queries: `GraphqlEndpoint.run(query_id, ...)` POSTs `/api/extras/graphql-queries/<id>/run/`, and the `GraphqlQueries` record gets an `await record.run(...)`.
 - Consider surfacing `errors` on a 200 response too. GraphQL can return `200` with a partial `data` plus `errors`; pynautobot silently hands that back as a successful `GraphQLRecord`. Leaving the raw json accessible is fine, but the behavior should be a documented choice rather than an accident.
@@ -139,7 +140,8 @@ Port only the pynautobot model behaviors that are real behavior, not
 ## Phase 7: typed endpoint hints (done)
 
 Generated from demo.nautobot.com (Nautobot 3.2.2, API version 3.2): 164
-endpoints across 13 apps, 2732 filter params. The demo does require
+endpoints across 13 apps, roughly 2700 filter params (the exact count
+drifts with each regeneration). The demo does require
 authentication, but it publishes a documented read-only token, so it works as
 a generation source the same way demo.netbox.dev does for aiopynetbox, and the
 weekly workflow needs no secret.
@@ -173,7 +175,7 @@ difference.
 
 - `examples/fastapi_app.py`, mirroring aiopynetbox's lifespan/app-state pattern. Done.
 - README API tour. Done.
-- CHANGELOG 0.1.0 entry, including the deferred-hints note. Done.
+- CHANGELOG 0.1.0 entry. Done.
 - Still to do, and only you can do it: create the GitHub mirror, claim the PyPI name, configure trusted publishing plus the `pypi` GitHub environment, then tag 0.1.0.
 - A compatibility matrix like pynautobot's is still worth adding once there is a second supported Nautobot release to compare against.
 

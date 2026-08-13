@@ -1,8 +1,9 @@
 import json
 
 import pytest
-from conftest import DEVICE_IDS, LOCATION_ID, make_api
+from conftest import DEVICE_IDS, LOCATION_ID, FakeNautobot, make_api, make_device
 
+from aiopynautobot.models import Devices
 from aiopynautobot.response import Record
 
 
@@ -106,6 +107,12 @@ async def test_records_without_identity_compare_by_identity(nb):
     assert device.status != other.status  # choice fields have no url/id
 
 
+async def test_field_colliding_with_a_property_names_itself(nb):
+    """A plugin payload with a field named like a property must fail clearly."""
+    with pytest.raises(AttributeError, match="napalm"):
+        Devices({"id": DEVICE_IDS[0], "napalm": {"driver": "ios"}}, nb, full=True)
+
+
 async def test_str_prefers_display(nb):
     device = await nb.dcim.devices.get(DEVICE_IDS[0])
     assert str(device) == "sw-1"
@@ -138,6 +145,32 @@ async def test_explicit_offset_fetches_one_page(fake):
     async with make_api(fake) as nb:
         names = [d.name async for d in nb.dcim.devices.all(limit=2, offset=2)]
     assert names == ["sw-3", "sw-4"]
+
+
+async def test_offset_passed_as_a_filter_fetches_one_page(fake):
+    """An offset in the filters pins the query just like the all() arg."""
+    async with make_api(fake) as nb:
+        names = [d.name async for d in nb.dcim.devices.filter(offset=2, limit=2)]
+    assert names == ["sw-3", "sw-4"]
+
+
+async def test_early_break_does_not_fetch_every_page():
+    """The fan-out is a sliding window, so abandoning iteration stops it."""
+    fake = FakeNautobot(
+        devices=[
+            make_device(f"{i:08d}-0000-4000-8000-000000000000", f"sw-{i}")
+            for i in range(40)
+        ],
+        page_size=2,
+    )
+    async with make_api(fake) as nb:
+        seen = []
+        async for device in nb.dcim.devices.all():
+            seen.append(device.name)
+            if len(seen) == 3:  # one record past the first page
+                break
+    assert seen == ["sw-0", "sw-1", "sw-2"]
+    assert len(fake.requests) <= 1 + nb.max_concurrency + 2
 
 
 async def test_count(nb):

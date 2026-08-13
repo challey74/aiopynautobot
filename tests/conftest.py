@@ -129,15 +129,11 @@ class FakeNautobot:
         if path == "/api/graphql/":
             return self._graphql(request)
 
-        if path == "/api/dcim/_choices/":
-            return httpx.Response(200, json={"device:face": []})
         if path == "/api/users/config/":
             return httpx.Response(200, json={"tables": {}})
-        if path == "/api/extras/custom-fields/":
-            return httpx.Response(200, json=[{"key": "billing_code"}])
-        if path == "/api/extras/custom-field-choices/":
-            return httpx.Response(200, json=[{"value": "first"}])
 
+        if response := self._custom_fields(request, path, params):
+            return response
         if response := self._jobs(request, path):
             return response
         if response := self._ipam(request, path):
@@ -148,6 +144,32 @@ class FakeNautobot:
             return self._devices_list(request, params)
 
         return httpx.Response(500, json={"error": f"unhandled path {path}"})
+
+    def _custom_fields(self, request, path, params):
+        """A paginated envelope, one item per page, so draining is exercised."""
+        items = {
+            "/api/extras/custom-fields/": [{"key": "billing_code"}, {"key": "owner"}],
+            "/api/extras/custom-field-choices/": [
+                {"value": "first"},
+                {"value": "second"},
+            ],
+        }.get(path)
+        if items is None:
+            return None
+        offset = int(params.get("offset", 0))
+        has_next = offset + 1 < len(items)
+        return httpx.Response(
+            200,
+            json={
+                "count": len(items),
+                # A real `next` link carries the original filters along.
+                "next": str(request.url.copy_set_param("offset", offset + 1))
+                if has_next
+                else None,
+                "previous": None,
+                "results": items[offset : offset + 1],
+            },
+        )
 
     def _graphql(self, request):
         body = json.loads(request.content)
@@ -217,7 +239,7 @@ class FakeNautobot:
             return httpx.Response(200, json=LOCATION_FULL)
         if path == f"/api/dcim/racks/{RACK_ID}/":
             return httpx.Response(200, json=RACK_FULL)
-        if path == f"/api/dcim/racks/{RACK_ID}/units/":
+        if path == f"/api/dcim/racks/{RACK_ID}/elevation/":
             return httpx.Response(200, json=[{"id": 1, "display": "U1", "name": "U1"}])
         if path == f"/api/dcim/interfaces/{INTERFACE_ID}/":
             return httpx.Response(200, json=self._interface())
@@ -237,7 +259,13 @@ class FakeNautobot:
                     ]
                 ],
             )
-        if m := re.fullmatch(r"/api/dcim/devices/([0-9a-f-]+)/", path):
+        if m := re.fullmatch(r"/api/dcim/devices/([^/]+)/napalm/", path):
+            # A detail route answering with a plain object, not a page.
+            return httpx.Response(
+                200, json={"get_facts": {"hostname": self.devices[m.group(1)]["name"]}}
+            )
+        # Any segment, not just a UUID, so percent-encoded keys route here.
+        if m := re.fullmatch(r"/api/dcim/devices/([^/]+)/", path):
             return self._device_detail(request, m.group(1))
         return None
 

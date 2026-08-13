@@ -68,25 +68,34 @@ async def test_installed_plugins(nb):
     assert plugins[0]["name"] == "test_plugin"
 
 
-async def test_app_choices(nb, fake):
-    await nb.dcim.choices()
-    assert fake.requests[-1].url.path == "/api/dcim/_choices/"
-
-
 async def test_app_config(nb, fake):
     await nb.users.config()
     assert fake.requests[-1].url.path == "/api/users/config/"
 
 
-async def test_app_custom_fields(nb, fake):
+def test_app_has_no_choices_helper(nb):
+    """The /<app>/_choices/ route is gone in Nautobot 3.x."""
+    assert not hasattr(type(nb.dcim), "choices")
+
+
+async def test_app_custom_fields_drains_pages(nb, fake):
     fields = await nb.extras.get_custom_fields()
-    assert fields[0]["key"] == "billing_code"
-    assert fake.requests[-1].url.path == "/api/extras/custom-fields/"
+    assert [f["key"] for f in fields] == ["billing_code", "owner"]
+    calls = [r for r in fake.requests if r.url.path == "/api/extras/custom-fields/"]
+    assert len(calls) == 2
 
 
-async def test_app_custom_field_choices_with_filters(nb, fake):
-    await nb.extras.get_custom_field_choices(filters={"field": "billing_code"})
-    assert fake.requests[-1].url.params["field"] == "billing_code"
+async def test_app_custom_field_choices_drains_pages_keeping_filters(nb, fake):
+    choices = await nb.extras.get_custom_field_choices(
+        filters={"field": "billing_code"}
+    )
+    assert [c["value"] for c in choices] == ["first", "second"]
+    calls = [
+        r for r in fake.requests if r.url.path == "/api/extras/custom-field-choices/"
+    ]
+    assert len(calls) == 2
+    # The next link carries the filter, so page 2 stays on the same query.
+    assert all(r.url.params["field"] == "billing_code" for r in calls)
 
 
 async def test_endpoint_choices_parses_both_shapes(nb):
@@ -146,3 +155,11 @@ async def test_get_by_uuid(nb):
     device = await nb.dcim.devices.get(DEVICE_IDS[0])
     assert device is not None
     assert device.name == "sw-1"
+
+
+async def test_get_percent_encodes_the_pk(nb, fake):
+    """A natural key with ? or a space must not corrupt the URL."""
+    assert await nb.dcim.devices.get("name with space?x") is None
+    request = fake.requests[-1]
+    assert request.url.raw_path == b"/api/dcim/devices/name%20with%20space%3Fx/"
+    assert not request.url.query

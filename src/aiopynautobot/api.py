@@ -29,6 +29,10 @@ from aiopynautobot.apps_generated import (
 from aiopynautobot.exceptions import AllocationError, ContentError, RequestError
 from aiopynautobot.graphql import GraphQLQuery
 
+# Read once at import: importlib.metadata.version() reads package metadata
+# from disk, which is far too slow to repeat per request.
+USER_AGENT = f"python-aiopynautobot/{_version('aiopynautobot')}"
+
 
 class Api:
     """Async Nautobot API client.
@@ -47,7 +51,8 @@ class Api:
     Args:
         url: Base Nautobot URL without the /api suffix (it is appended).
         token: API token, sent as `Authorization: Token <token>`.
-        timeout: Per-request timeout in seconds.
+        timeout: Per-request timeout in seconds. Ignored when `client` is
+            supplied; set it on that client instead.
         max_concurrency: Concurrent page fetches per result-set iteration.
         retries: Bound on automatic retries with exponential backoff and
             jitter. 429 is retried for any method (honoring Retry-After);
@@ -85,6 +90,7 @@ class Api:
         self.retries = retries
         self.api_version = api_version
         self._openapi: dict[str, Any] | None = None
+        self._openapi_lock = asyncio.Lock()
 
         # Applied to every read (and to create, so the response carries the
         # same opt-in fields). Unlike pynautobot these also reach count().
@@ -145,10 +151,7 @@ class Api:
         accept = "application/json"
         if self.api_version:
             accept = f"{accept}; version={self.api_version}"
-        headers = {
-            "Accept": accept,
-            "User-Agent": f"python-aiopynautobot/{_version('aiopynautobot')}",
-        }
+        headers = {"Accept": accept, "User-Agent": USER_AGENT}
         if self.token:
             headers["Authorization"] = f"Token {self.token}"
         return headers
@@ -174,9 +177,17 @@ class Api:
         headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         merged = {**self._headers(), **(headers or {})}
-        if method in ("GET", "POST"):
-            # Explicit params win over the client-wide defaults.
-            params = {**self.default_filters, **(params or {})}
+        if method in ("GET", "POST") and (self.default_filters or params):
+            # Explicit params win over the client-wide defaults. They are
+            # merged into the url rather than passed to httpx, which would
+            # replace any query string the url already carries (a paginator's
+            # `next` link does).
+            url = str(
+                httpx.URL(url).copy_merge_params(
+                    {**self.default_filters, **(params or {})}
+                )
+            )
+            params = None
         attempt = 0
         while True:
             retry_after = None
@@ -239,10 +250,13 @@ class Api:
         Works with restricted tokens and on instances that require login:
         a 403 still carries the header.
         """
-        resp = await self._client.get(f"{self.base_url}/", headers=self._headers())
-        if resp.is_success or resp.status_code == 403:
-            return resp.headers.get("API-Version", "")
-        raise RequestError(resp)
+        try:
+            resp = await self._request_response("GET", f"{self.base_url}/")
+        except RequestError as e:
+            if e.status_code == 403:
+                return e.response.headers.get("API-Version", "")
+            raise
+        return resp.headers.get("API-Version", "")
 
     async def status(self) -> dict[str, Any]:
         """The /api/status/ payload (Nautobot version, apps, workers...)."""
@@ -254,7 +268,13 @@ class Api:
         Nautobot serves this at /api/swagger.json, not NetBox's
         /api/schema/.
         """
-        if self._openapi is None:
-            self._openapi = await self._request("GET", f"{self.base_url}/swagger.json")
-        assert self._openapi is not None
-        return self._openapi
+        if self._openapi is not None:
+            return self._openapi
+        # The lock keeps concurrent first calls to a single fetch.
+        async with self._openapi_lock:
+            if self._openapi is None:
+                spec: dict[str, Any] = await self._request(
+                    "GET", f"{self.base_url}/swagger.json"
+                )
+                self._openapi = spec
+            return self._openapi
