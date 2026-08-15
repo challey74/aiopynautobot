@@ -92,6 +92,23 @@ async def test_openapi(live):
     assert "paths" in await live.openapi()
 
 
+async def test_cable_trace(live):
+    from aiopynautobot.models import Interfaces
+
+    iface = await anext(
+        aiter(live.dcim.interfaces.filter(has_cable=True, limit=1)), None
+    )
+    if iface is None:
+        pytest.skip("no cabled interface on instance")
+    hops = await iface.trace()
+    assert hops
+    termination_a, cable, _termination_b = hops[0]
+    assert isinstance(termination_a, Interfaces)
+    # The trace payload ships the cable without a url (verified against
+    # Nautobot 3.2), so it stays a base Record rather than Cables.
+    assert cable is not None
+
+
 needs_writes = pytest.mark.skipif(
     not DEMO_WRITES, reason="AIOPYNAUTOBOT_DEMO_WRITES=1 not set; writes are opt-in"
 )
@@ -134,6 +151,29 @@ async def test_write_lifecycle(live):
         async for leftover in live.tenancy.tenants.filter(q=tag):
             await leftover.delete()
         assert await live.tenancy.tenants.count(q=tag) == 0
+
+
+@needs_writes
+async def test_job_run_and_wait(live):
+    """Run the built-in Export Object List job (read-only output), poll it
+    to completion, then delete the job result it left behind."""
+    content_type = await live.extras.content_types.get(
+        app_label="dcim", model="manufacturer"
+    )
+    if content_type is None:
+        pytest.skip("no dcim.manufacturer content type on instance")
+    job = await live.extras.jobs.run_and_wait(
+        job_name="Export Object List",
+        data={"content_type": content_type.id},
+        interval=3,
+        timeout=180,
+    )
+    result = job.job_result
+    try:
+        assert result.status.value == "SUCCESS"
+    finally:
+        assert await result.delete() is True
+        assert await live.extras.job_results.get(str(result.id)) is None
 
 
 @needs_writes
