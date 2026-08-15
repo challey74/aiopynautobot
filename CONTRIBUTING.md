@@ -26,9 +26,12 @@ an endpoint or behavior the fake doesn't model yet, extend the fake.
 
 New features and bug fixes should come with tests.
 
-Opt-in read-only integration tests against a live Nautobot live in
+Opt-in integration tests against a live Nautobot live in
 `tests/test_demo_integration.py`; set `AIOPYNAUTOBOT_DEMO_URL` (and
-`AIOPYNAUTOBOT_DEMO_TOKEN` for a non-demo instance) to run them.
+`AIOPYNAUTOBOT_DEMO_TOKEN` for a non-demo instance) to run the read-only
+ones. The write tests additionally need `AIOPYNAUTOBOT_DEMO_WRITES=1`;
+they clean up after themselves, but only enable them against an instance
+whose data is disposable.
 
 ## Generated files
 
