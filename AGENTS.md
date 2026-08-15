@@ -34,9 +34,11 @@ recorded at the bottom of that file.
 pytest-asyncio runs in `asyncio_mode = "auto"` - async test functions need no decorator.
 
 Git lives in WSL, not Windows: run git through `wsl -e bash -lc "cd /mnt/d/dev/aiopynautobot && git ..."`.
-The remote is `ssh://git@ssh.git.ints.cc/challey/aiopynautobot.git`; a public
-GitHub mirror at `challey74/aiopynautobot` is planned and the workflow files
-and project URLs already assume it.
+`origin` is GitHub (`git@github.com:challey74/aiopynautobot.git`, the
+public repo where CI, releases, and PRs happen); `ints`
+(`ssh://git@ssh.git.ints.cc/challey/aiopynautobot.git`) is a secondary
+remote, push there too when convenient. Never add Co-Authored-By
+trailers to commits.
 
 ## Design constraints (why this isn't just "pynautobot with await")
 
