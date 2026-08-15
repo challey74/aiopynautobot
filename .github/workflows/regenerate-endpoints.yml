@@ -1,0 +1,41 @@
+﻿name: Regenerate endpoints
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+      - run: uv sync --frozen
+      - run: uv run python scripts/generate_endpoints.py
+      - run: uv run ruff format src/aiopynautobot/apps_generated.py src/aiopynautobot/hints_generated.pyi
+      # PRs opened with GITHUB_TOKEN don't trigger the CI workflow, so run
+      # the full check suite here before opening one.
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run pyright
+      - run: uv run pytest
+      - uses: peter-evans/create-pull-request@v8
+        with:
+          commit-message: "chore: regenerate endpoint hints from demo.nautobot.com"
+          title: "chore: regenerate endpoint hints"
+          body: >
+            Automated regeneration of the typed endpoint hints in
+            src/aiopynautobot/apps_generated.py and hints_generated.pyi from
+            demo.nautobot.com's OpenAPI schema. A diff here usually means a new
+            Nautobot release added or removed endpoints or filter params.
+
+
+            If the demo instance has moved to a Nautobot major version this
+            library does not support yet, close this and pin the generator to a
+            container instead (see the script docstring).
+          branch: regenerate-endpoints
+          delete-branch: true

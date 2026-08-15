@@ -1,0 +1,13 @@
+aiopynautobot
+Copyright 2026 Cody Halley
+
+This work is an independent async client for the Nautobot REST and GraphQL
+APIs. It is not a port of pynautobot, but it does follow pynautobot's
+public API shape where that shape is compatible with asyncio.
+
+pynautobot is copyrighted and licensed under Apache License 2.0 by
+Network to Code, LLC, and is based in part upon pynetbox, copyrighted and
+licensed under Apache License 2.0 by DigitalOcean, LLC.
+
+No code from either project is vendored here. Any future vendored code must
+retain its original copyright notice and Apache License 2.0 header.
