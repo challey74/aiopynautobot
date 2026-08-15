@@ -46,6 +46,30 @@ async def test_prefix_available_ips_create_many(nb):
     assert len(ips) == 2
 
 
+async def test_prefix_available_prefixes(nb, fake):
+    prefix = await nb.ipam.prefixes.get(PREFIX_ID)
+    listed = [p async for p in prefix.available_prefixes.list()]
+    assert [str(p) for p in listed] == ["10.0.0.0/30"]
+    child = await prefix.available_prefixes.create({"prefix_length": 30})
+    assert isinstance(child, Prefixes)
+    assert child.prefix == "10.0.0.0/30"
+    assert fake.requests[-1].url.path.endswith("/available-prefixes/")
+
+
+async def test_count_on_bare_list_route(nb):
+    prefix = await nb.ipam.prefixes.get(PREFIX_ID)
+    assert await prefix.available_ips.list().count() == 3
+
+
+async def test_dynamic_group_members_url(nb):
+    group = nb.extras.dynamic_groups.record_class(
+        {"id": "1", "url": "http://nautobot.test/api/extras/dynamic-groups/1/"},
+        nb,
+        full=True,
+    )
+    assert group.members.url.endswith("/extras/dynamic-groups/1/members/")
+
+
 async def test_allocation_error_on_204(nb):
     """Nautobot reports an exhausted pool with 204, not NetBox's 409."""
     prefix = await nb.ipam.prefixes.get(PREFIX_ID)

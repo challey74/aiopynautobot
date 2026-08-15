@@ -23,6 +23,7 @@ JOB_ID = "55555555-5555-4555-8555-555555555501"
 JOB_RESULT_ID = "55555555-5555-4555-8555-555555555502"
 INTERFACE_ID = "66666666-6666-4666-8666-666666666601"
 CABLE_ID = "66666666-6666-4666-8666-666666666602"
+QUERY_ID = "88888888-8888-4888-8888-888888888801"
 
 
 def make_device(pk, name, serial="", location_id=LOCATION_ID):
@@ -192,6 +193,12 @@ class FakeNautobot:
                     }
                 },
             )
+        if path == f"/api/extras/graphql-queries/{QUERY_ID}/run/":
+            body = json.loads(request.content)
+            variables = body.get("variables") or {}
+            return httpx.Response(
+                200, json={"data": {"devices": [{"name": variables.get("name", "*")}]}}
+            )
         if path == f"/api/extras/job-results/{JOB_RESULT_ID}/":
             status = self.job_statuses.pop(0) if self.job_statuses else "SUCCESS"
             return httpx.Response(
@@ -209,6 +216,17 @@ class FakeNautobot:
     def _ipam(self, request, path):
         if path == f"/api/ipam/prefixes/{PREFIX_ID}/":
             return httpx.Response(200, json=PREFIX_FULL)
+        if path == f"/api/ipam/prefixes/{PREFIX_ID}/available-prefixes/":
+            if request.method == "GET":
+                return httpx.Response(200, json=[{"prefix": "10.0.0.0/30"}])
+            child = {
+                "id": "33333333-3333-4333-8333-333333333302",
+                "url": f"{BASE}/api/ipam/prefixes/33333302/",
+                "display": "10.0.0.0/30",
+                "prefix": "10.0.0.0/30",
+            }
+            child.update(json.loads(request.content))
+            return httpx.Response(201, json=child)
         if path != f"/api/ipam/prefixes/{PREFIX_ID}/available-ips/":
             return None
         if request.method == "GET":

@@ -2,7 +2,7 @@ import json
 
 import httpx
 import pytest
-from conftest import BASE, JOB_ID, JOB_RESULT_ID, make_api
+from conftest import BASE, JOB_ID, JOB_RESULT_ID, QUERY_ID, make_api
 
 import aiopynautobot
 
@@ -116,9 +116,24 @@ async def test_job_record_run(nb, fake):
 
 
 async def test_saved_graphql_query_run(nb, fake):
-    query_id = "88888888-8888-4888-8888-888888888801"
-    with pytest.raises(aiopynautobot.RequestError):
-        await nb.extras.graphql_queries.run(query_id, name="sw-1")
+    result = await nb.extras.graphql_queries.run(QUERY_ID, name="sw-1")
     request = fake.requests[-1]
-    assert request.url.path == f"/api/extras/graphql-queries/{query_id}/run/"
+    assert request.url.path == f"/api/extras/graphql-queries/{QUERY_ID}/run/"
     assert json.loads(request.content) == {"variables": {"name": "sw-1"}}
+    assert result.data["devices"][0]["name"] == "sw-1"
+
+
+async def test_saved_graphql_query_record_run(nb, fake):
+    """A GraphqlQueries record can execute itself via its detail route."""
+    record = nb.extras.graphql_queries.record_class(
+        {
+            "id": QUERY_ID,
+            "url": f"{BASE}/api/extras/graphql-queries/{QUERY_ID}/",
+            "display": "saved query",
+        },
+        nb,
+        full=True,
+    )
+    result = await record.run(name="sw-2")
+    assert fake.requests[-1].url.path == f"/api/extras/graphql-queries/{QUERY_ID}/run/"
+    assert result.data["devices"][0]["name"] == "sw-2"

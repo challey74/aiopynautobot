@@ -199,6 +199,19 @@ async def test_bulk_update_empty_set_sends_nothing(nb, fake):
     assert not [r for r in fake.requests[before:] if r.method == "PATCH"]
 
 
+async def test_endpoint_bulk_update(nb, fake):
+    """The explicit-id bulk PATCH form on the endpoint itself."""
+    updated = await nb.dcim.devices.update(
+        [
+            {"id": DEVICE_IDS[0], "serial": "EP-1"},
+            {"id": DEVICE_IDS[1], "serial": "EP-2"},
+        ]
+    )
+    assert [r.serial for r in updated] == ["EP-1", "EP-2"]
+    patch = [r for r in fake.requests if r.method == "PATCH"][-1]
+    assert {item["id"] for item in json.loads(patch.content)} == set(DEVICE_IDS[:2])
+
+
 async def test_bulk_delete_via_recordset(nb, fake):
     assert await nb.dcim.devices.filter(name="sw-2").delete() is True
     assert DEVICE_IDS[1] not in fake.devices
