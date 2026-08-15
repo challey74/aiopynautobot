@@ -196,6 +196,6 @@ someone will otherwise re-litigate:
 
 Still open:
 
-7. **Integration tests against a live Nautobot.** The demo covers schema generation, but every behavioral test still runs against the in-memory fake. A container would allow pynautobot-style integration tests; worth doing once there is a reason to distrust the fake.
+7. **Integration tests against a live Nautobot: done, opt-in.** `tests/test_demo_integration.py` runs read-only checks (pagination fan-out, gets, full_details, custom-field draining, GraphQL, openapi) against any instance via `AIOPYNAUTOBOT_DEMO_URL`, defaulting the token to the demo's documented read-only one. Skipped when the env var is unset so the default suite stays offline. Verified green against demo.nautobot.com (Nautobot 3.2.2). Write-path integration tests still need a disposable container.
 8. **GitHub mirror timing.** Workflow files and `pyproject.toml` URLs already assume `challey74/aiopynautobot`. Until the mirror exists, CI does not run anywhere - a Forgejo Actions runner on ints.cc reading `.github/workflows/` would close that gap in the meantime.
 9. **GraphQL 200-with-errors.** Exposed as `result.errors` and documented, deliberately not raised, since partial data is often still useful. Revisit if it surprises people in practice.
