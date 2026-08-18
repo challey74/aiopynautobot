@@ -1,7 +1,7 @@
 import json
 import re
 
-import httpx
+import httpx2
 import pytest
 
 import aiopynautobot
@@ -93,7 +93,7 @@ DEVICE_OPTIONS = {
 
 
 class FakeNautobot:
-    """Minimal in-memory Nautobot served through httpx.MockTransport."""
+    """Minimal in-memory Nautobot served through httpx2.MockTransport."""
 
     def __init__(self, devices=None, page_size=50):
         self.devices = {d["id"]: d for d in (devices or [])}
@@ -102,7 +102,7 @@ class FakeNautobot:
         self.created = 0
         # Failure injection for retry tests: each entry is consumed by one
         # request before normal routing. An int is an HTTP status to return;
-        # "transport" raises httpx.ConnectError.
+        # "transport" raises httpx2.ConnectError.
         self.fail_next = []
         # Job result statuses handed out on successive polls.
         self.job_statuses = ["PENDING", "STARTED", "SUCCESS"]
@@ -112,26 +112,28 @@ class FakeNautobot:
         if self.fail_next:
             failure = self.fail_next.pop(0)
             if failure == "transport":
-                raise httpx.ConnectError("injected failure")
-            return httpx.Response(
+                raise httpx2.ConnectError("injected failure")
+            return httpx2.Response(
                 failure, json={"detail": "injected"}, headers={"Retry-After": "0"}
             )
         path = request.url.path
         params = request.url.params
 
         if path == "/api/" and request.method == "GET":
-            return httpx.Response(403, json={}, headers={"API-Version": "2.4"})
+            return httpx2.Response(403, json={}, headers={"API-Version": "2.4"})
         if path == "/api/status/":
-            return httpx.Response(200, json={"nautobot-version": "2.4.0"})
+            return httpx2.Response(200, json={"nautobot-version": "2.4.0"})
         if path == "/api/swagger.json":
-            return httpx.Response(200, json={"openapi": "3.0.3", "paths": {}})
+            return httpx2.Response(200, json={"openapi": "3.0.3", "paths": {}})
         if path == "/api/plugins/installed-plugins/":
-            return httpx.Response(200, json=[{"name": "test_plugin", "version": "1.0"}])
+            return httpx2.Response(
+                200, json=[{"name": "test_plugin", "version": "1.0"}]
+            )
         if path == "/api/graphql/":
             return self._graphql(request)
 
         if path == "/api/users/config/":
-            return httpx.Response(200, json={"tables": {}})
+            return httpx2.Response(200, json={"tables": {}})
 
         if response := self._custom_fields(request, path, params):
             return response
@@ -144,7 +146,7 @@ class FakeNautobot:
         if path == "/api/dcim/devices/":
             return self._devices_list(request, params)
 
-        return httpx.Response(500, json={"error": f"unhandled path {path}"})
+        return httpx2.Response(500, json={"error": f"unhandled path {path}"})
 
     def _custom_fields(self, request, path, params):
         """A paginated envelope, one item per page, so draining is exercised."""
@@ -159,7 +161,7 @@ class FakeNautobot:
             return None
         offset = int(params.get("offset", 0))
         has_next = offset + 1 < len(items)
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "count": len(items),
@@ -175,14 +177,14 @@ class FakeNautobot:
     def _graphql(self, request):
         body = json.loads(request.content)
         if "bogus" in body["query"]:
-            return httpx.Response(
+            return httpx2.Response(
                 400, json={"errors": [{"message": 'Cannot query field "bogus".'}]}
             )
-        return httpx.Response(200, json={"data": {"devices": [{"name": "sw-1"}]}})
+        return httpx2.Response(200, json={"data": {"devices": [{"name": "sw-1"}]}})
 
     def _jobs(self, request, path):
         if path == f"/api/extras/jobs/{JOB_ID}/run/" and request.method == "POST":
-            return httpx.Response(
+            return httpx2.Response(
                 201,
                 json={
                     "job_result": {
@@ -196,12 +198,12 @@ class FakeNautobot:
         if path == f"/api/extras/graphql-queries/{QUERY_ID}/run/":
             body = json.loads(request.content)
             variables = body.get("variables") or {}
-            return httpx.Response(
+            return httpx2.Response(
                 200, json={"data": {"devices": [{"name": variables.get("name", "*")}]}}
             )
         if path == f"/api/extras/job-results/{JOB_RESULT_ID}/":
             status = self.job_statuses.pop(0) if self.job_statuses else "SUCCESS"
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "id": JOB_RESULT_ID,
@@ -215,10 +217,10 @@ class FakeNautobot:
 
     def _ipam(self, request, path):
         if path == f"/api/ipam/prefixes/{PREFIX_ID}/":
-            return httpx.Response(200, json=PREFIX_FULL)
+            return httpx2.Response(200, json=PREFIX_FULL)
         if path == f"/api/ipam/prefixes/{PREFIX_ID}/available-prefixes/":
             if request.method == "GET":
-                return httpx.Response(200, json=[{"prefix": "10.0.0.0/30"}])
+                return httpx2.Response(200, json=[{"prefix": "10.0.0.0/30"}])
             child = {
                 "id": "33333333-3333-4333-8333-333333333302",
                 "url": f"{BASE}/api/ipam/prefixes/33333302/",
@@ -226,11 +228,11 @@ class FakeNautobot:
                 "prefix": "10.0.0.0/30",
             }
             child.update(json.loads(request.content))
-            return httpx.Response(201, json=child)
+            return httpx2.Response(201, json=child)
         if path != f"/api/ipam/prefixes/{PREFIX_ID}/available-ips/":
             return None
         if request.method == "GET":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json=[{"family": 4, "address": f"10.0.0.{i}/29"} for i in (1, 2, 3)],
             )
@@ -238,7 +240,7 @@ class FakeNautobot:
         items = body if isinstance(body, list) else [body]
         if len(items) > 3:
             # Nautobot signals an exhausted pool with an empty 204.
-            return httpx.Response(204)
+            return httpx2.Response(204)
         created = []
         for n, item in enumerate(items, 1):
             ip = {
@@ -250,19 +252,19 @@ class FakeNautobot:
             ip.update(item)
             created.append(ip)
         payload = created if isinstance(body, list) else created[0]
-        return httpx.Response(201, json=payload)
+        return httpx2.Response(201, json=payload)
 
     def _dcim_detail(self, request, path):
         if path == f"/api/dcim/locations/{LOCATION_ID}/":
-            return httpx.Response(200, json=LOCATION_FULL)
+            return httpx2.Response(200, json=LOCATION_FULL)
         if path == f"/api/dcim/racks/{RACK_ID}/":
-            return httpx.Response(200, json=RACK_FULL)
+            return httpx2.Response(200, json=RACK_FULL)
         if path == f"/api/dcim/racks/{RACK_ID}/elevation/":
-            return httpx.Response(200, json=[{"id": 1, "display": "U1", "name": "U1"}])
+            return httpx2.Response(200, json=[{"id": 1, "display": "U1", "name": "U1"}])
         if path == f"/api/dcim/interfaces/{INTERFACE_ID}/":
-            return httpx.Response(200, json=self._interface())
+            return httpx2.Response(200, json=self._interface())
         if path == f"/api/dcim/interfaces/{INTERFACE_ID}/trace/":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json=[
                     [
@@ -279,7 +281,7 @@ class FakeNautobot:
             )
         if m := re.fullmatch(r"/api/dcim/devices/([^/]+)/napalm/", path):
             # A detail route answering with a plain object, not a page.
-            return httpx.Response(
+            return httpx2.Response(
                 200, json={"get_facts": {"hostname": self.devices[m.group(1)]["name"]}}
             )
         # Any segment, not just a UUID, so percent-encoded keys route here.
@@ -298,29 +300,29 @@ class FakeNautobot:
     def _device_detail(self, request, pk):
         device = self.devices.get(pk)
         if not device:
-            return httpx.Response(404, json={"detail": "Not found."})
+            return httpx2.Response(404, json={"detail": "Not found."})
         if request.method == "PATCH":
             device.update(json.loads(request.content))
-            return httpx.Response(200, json=device)
+            return httpx2.Response(200, json=device)
         if request.method == "DELETE":
             del self.devices[pk]
-            return httpx.Response(204)
-        return httpx.Response(200, json=device)
+            return httpx2.Response(204)
+        return httpx2.Response(200, json=device)
 
     def _devices_list(self, request, params):
         if request.method == "OPTIONS":
-            return httpx.Response(200, json=DEVICE_OPTIONS)
+            return httpx2.Response(200, json=DEVICE_OPTIONS)
         if request.method == "PATCH":
             updated = []
             for item in json.loads(request.content):
                 device = self.devices[item["id"]]
                 device.update({k: v for k, v in item.items() if k != "id"})
                 updated.append(device)
-            return httpx.Response(200, json=updated)
+            return httpx2.Response(200, json=updated)
         if request.method == "DELETE":
             for item in json.loads(request.content):
                 del self.devices[item["id"]]
-            return httpx.Response(204)
+            return httpx2.Response(204)
         if request.method == "POST":
             body = json.loads(request.content)
             created = []
@@ -332,7 +334,7 @@ class FakeNautobot:
                 self.devices[pk] = device
                 created.append(device)
             payload = created if isinstance(body, list) else created[0]
-            return httpx.Response(201, json=payload)
+            return httpx2.Response(201, json=payload)
         matches = [
             d
             for d in self.devices.values()
@@ -346,7 +348,7 @@ class FakeNautobot:
         offset = int(params.get("offset", 0))
         page = matches[offset : offset + limit]
         has_next = offset + limit < len(matches)
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "count": len(matches),
@@ -373,7 +375,7 @@ def fake():
 
 
 def make_api(fake, token="abc123", **kwargs):
-    client = httpx.AsyncClient(transport=httpx.MockTransport(fake.handler))
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(fake.handler))
     return aiopynautobot.api(BASE, token=token, client=client, **kwargs)
 
 

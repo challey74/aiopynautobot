@@ -1,4 +1,4 @@
-import httpx
+import httpx2
 import pytest
 from conftest import BASE, DEVICE_IDS, make_api
 
@@ -126,7 +126,7 @@ async def test_endpoint_choices_rejects_legacy_shape(fake):
 
     def legacy(request):
         if request.method == "OPTIONS":
-            return httpx.Response(200, json={"schema": {"properties": {}}})
+            return httpx2.Response(200, json={"schema": {"properties": {}}})
         return real_handler(request)
 
     fake.handler = legacy

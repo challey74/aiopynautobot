@@ -1,6 +1,6 @@
 import json
 
-import httpx
+import httpx2
 import pytest
 from conftest import BASE, JOB_ID, JOB_RESULT_ID, QUERY_ID, make_api
 
@@ -56,7 +56,7 @@ async def test_run_and_wait_skips_polling_when_already_terminal(fake):
         if request.url.path.endswith("/run/"):
             body = response.json()
             body["job_result"]["status"] = {"value": "SUCCESS", "label": "Success"}
-            return httpx.Response(201, json=body)
+            return httpx2.Response(201, json=body)
         return response
 
     fake.handler = finished
@@ -78,7 +78,7 @@ async def test_run_and_wait_rejects_an_unpollable_job_result(fake):
         if request.url.path.endswith("/run/"):
             body = response.json()
             del body["job_result"]["url"]
-            return httpx.Response(201, json=body)
+            return httpx2.Response(201, json=body)
         return response
 
     fake.handler = no_url

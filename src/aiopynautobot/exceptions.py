@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-import httpx
+import httpx2
 
 
 class RequestError(Exception):
     """Nautobot returned a non-success HTTP response."""
 
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(self, response: httpx2.Response) -> None:
         self.response = response
         self.status_code = response.status_code
         self.url = str(response.url)
@@ -36,7 +36,7 @@ class AllocationError(Exception):
     with an empty 204, where NetBox uses 409 Conflict.
     """
 
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(self, response: httpx2.Response) -> None:
         self.response = response
         self.url = str(response.url)
         self.error = "The requested allocation could not be fulfilled."
@@ -46,7 +46,7 @@ class AllocationError(Exception):
 class ContentError(Exception):
     """A successful response contained non-JSON content."""
 
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(self, response: httpx2.Response) -> None:
         self.response = response
         self.url = str(response.url)
         self.error = (
@@ -63,7 +63,7 @@ class GraphQLError(Exception):
             wrong with the query.
     """
 
-    def __init__(self, response: httpx.Response, errors: list[Any]) -> None:
+    def __init__(self, response: httpx2.Response, errors: list[Any]) -> None:
         self.response = response
         self.status_code = response.status_code
         self.url = str(response.url)

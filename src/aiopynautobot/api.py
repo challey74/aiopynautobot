@@ -8,7 +8,7 @@ from importlib.metadata import version as _version
 from types import TracebackType
 from typing import Any, Self
 
-import httpx
+import httpx2
 
 from aiopynautobot.app import PluginsApp
 from aiopynautobot.apps_generated import (
@@ -66,7 +66,7 @@ class Api:
             read responses, which is a large speedup on wide objects.
         include_default: Comma-separated opt-in fields added to every read,
             e.g. "config_context,computed_fields".
-        client: Custom httpx.AsyncClient (SSL config, proxies, mock
+        client: Custom httpx2.AsyncClient (SSL config, proxies, mock
             transports). A supplied client is yours to close; the Api
             closes only clients it creates itself.
     """
@@ -82,7 +82,7 @@ class Api:
         api_version: str | None = None,
         exclude_m2m: bool | None = None,
         include_default: str | None = None,
-        client: httpx.AsyncClient | None = None,
+        client: httpx2.AsyncClient | None = None,
     ) -> None:
         self.base_url = "{}/api".format(url.rstrip("/"))
         self.token = token
@@ -107,7 +107,7 @@ class Api:
         self._client = (
             client
             if client is not None
-            else httpx.AsyncClient(timeout=timeout, follow_redirects=True)
+            else httpx2.AsyncClient(timeout=timeout, follow_redirects=True)
         )
 
         self.circuits = CircuitsApp(self, "circuits")
@@ -141,7 +141,7 @@ class Api:
         """Close the connection pool, if this Api created it.
 
         A client passed in via `client=` is the caller's to close
-        (httpx convention), so sharing one client across Api instances
+        (httpx2 convention), so sharing one client across Api instances
         is safe.
         """
         if self._owns_client:
@@ -175,15 +175,15 @@ class Api:
         params: dict[str, Any] | None = None,
         json: Any = None,
         headers: dict[str, str] | None = None,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         merged = {**self._headers(), **(headers or {})}
         if method in ("GET", "POST") and (self.default_filters or params):
             # Explicit params win over the client-wide defaults. They are
-            # merged into the url rather than passed to httpx, which would
+            # merged into the url rather than passed to httpx2, which would
             # replace any query string the url already carries (a paginator's
             # `next` link does).
             url = str(
-                httpx.URL(url).copy_merge_params(
+                httpx2.URL(url).copy_merge_params(
                     {**self.default_filters, **(params or {})}
                 )
             )
@@ -195,7 +195,7 @@ class Api:
                 resp = await self._client.request(
                     method, url, params=params, json=json, headers=merged
                 )
-            except httpx.TransportError:
+            except httpx2.TransportError:
                 # An ambiguous failure is only safely repeatable for GETs:
                 # a timed-out write may have been processed server-side.
                 if method != "GET" or attempt >= self.retries:
@@ -222,7 +222,7 @@ class Api:
             attempt += 1
 
     @staticmethod
-    def _decode(resp: httpx.Response) -> Any:
+    def _decode(resp: httpx2.Response) -> Any:
         try:
             return resp.json()
         except ValueError:

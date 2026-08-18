@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-15
+
+### Changed
+
+- **Breaking**: migrated from httpx to [httpx2](https://github.com/pydantic/httpx2),
+  Pydantic's maintained continuation of httpx. The API surface is
+  unchanged, but a custom client passed via `Api(client=...)` must now be
+  an `httpx2.AsyncClient`, and the transport exceptions that surface from
+  connection failures are httpx2's (`httpx2.TransportError` and
+  subclasses).
+
 ## [0.1.0] - 2026-08-15
 
 Initial release. Requires Nautobot 2.4+.
@@ -80,5 +91,6 @@ Initial release. Requires Nautobot 2.4+.
 - A runnable FastAPI example (`examples/fastapi_app.py`) showing the
   app-state / lifespan usage pattern.
 
-[unreleased]: https://github.com/challey74/aiopynautobot/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/challey74/aiopynautobot/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/challey74/aiopynautobot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/challey74/aiopynautobot/releases/tag/v0.1.0

@@ -18,7 +18,7 @@ All four checks run in CI and must pass.
 ## Testing conventions
 
 Tests run entirely against `FakeNautobot` in `tests/conftest.py`, an
-in-memory Nautobot served through `httpx.MockTransport`. Tests never touch
+in-memory Nautobot served through `httpx2.MockTransport`. Tests never touch
 the network and never require a real Nautobot instance. If your change needs
 an endpoint or behavior the fake doesn't model yet, extend the fake.
 

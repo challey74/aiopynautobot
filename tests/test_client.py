@@ -1,4 +1,4 @@
-import httpx
+import httpx2
 import pytest
 from conftest import BASE, DEVICE_IDS, make_api
 
@@ -85,7 +85,7 @@ async def test_context_manager_closes_owned_client():
 
 
 async def test_supplied_client_is_not_closed(fake):
-    client = httpx.AsyncClient(transport=httpx.MockTransport(fake.handler))
+    client = httpx2.AsyncClient(transport=httpx2.MockTransport(fake.handler))
     async with aiopynautobot.api(BASE, token="x", client=client) as nb:
         await nb.status()
     assert not client.is_closed
@@ -102,7 +102,7 @@ async def test_request_error_carries_status_and_body(nb, fake):
 
 async def test_content_error_on_non_json(nb, fake):
     fake.fail_next = []
-    fake.handler = lambda request: httpx.Response(200, text="<html>nope</html>")
+    fake.handler = lambda request: httpx2.Response(200, text="<html>nope</html>")
     async with make_api(fake) as bad:
         with pytest.raises(aiopynautobot.ContentError, match="not a Nautobot server"):
             await bad.status()

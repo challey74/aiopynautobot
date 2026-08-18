@@ -6,7 +6,7 @@ here; this file is the single source.
 ## Project
 
 `aiopynautobot` - a fully async Nautobot API client, built from scratch with
-httpx. It is inspired by [pynautobot](https://github.com/nautobot/pynautobot)
+httpx2. It is inspired by [pynautobot](https://github.com/nautobot/pynautobot)
 (the sync client maintained by Network to Code) but is **not a port**:
 pynautobot's core ergonomics depend on sync-only Python protocols that cannot
 be awaited, so the API surface here is deliberately different (see Design
@@ -20,7 +20,7 @@ idiom rather than inventing new ones, and port fixes between the two.
 
 Package layout: `src/aiopynautobot/`, tests in `tests/`. Managed with `uv`.
 
-**Status: 0.1.0, feature-complete against pynautobot.** [PLAN.md](PLAN.md)
+**Status: 0.2.0, feature-complete against pynautobot.** [PLAN.md](PLAN.md)
 tracks the phases; all of them are done, and the decisions they resolved are
 recorded at the bottom of that file.
 
@@ -78,11 +78,11 @@ And these are Nautobot-specific additions with no NetBox counterpart:
 All HTTP funnels through `Api._request_response()` ([api.py](src/aiopynautobot/api.py)):
 auth header, the `Accept: application/json; version=` pin, User-Agent,
 `default_filters` injection (GET and POST only, explicit params winning, and
-merged into the url rather than passed to httpx, which would otherwise replace
+merged into the url rather than passed to httpx2, which would otherwise replace
 a `next` link's own query string),
 error raising (POST 204 -> `AllocationError`, other non-success ->
 `RequestError`), and the retry loop (429 for any method honoring
-Retry-After; 502/503/504 and `httpx.TransportError` for GET only, since
+Retry-After; 502/503/504 and `httpx2.TransportError` for GET only, since
 ambiguous writes may have been processed; `Api(retries=)` bounds attempts,
 `_backoff()` does capped exponential backoff with jitter) all live there and
 nowhere else. `Api._request()` adds JSON decoding (`_decode` -> `ContentError`).
@@ -140,7 +140,7 @@ Two traps when touching the generator, both covered by
 - `extras/jobs` and `extras/graphql_queries` are `JobsEndpoint`/`GraphqlEndpoint` at runtime, so their stubs must subclass the same (via the generator's `ENDPOINT_BASES`), or `run()` disappears from the hints.
 
 Tests run entirely against `FakeNautobot` in [tests/conftest.py](tests/conftest.py) -
-an in-memory Nautobot behind `httpx.MockTransport` (no network, no mocking
+an in-memory Nautobot behind `httpx2.MockTransport` (no network, no mocking
 library). Extend it when adding endpoints/behaviors.
 
 Not implemented yet (deliberately, add only when needed): OpenAPI filter
@@ -149,8 +149,8 @@ Nautobot.
 
 ## Conventions
 
-- httpx `AsyncClient` is the only HTTP transport; the client should be usable as an async context manager (`async with aiopynautobot.api(...) as nb:`) so the connection pool is closed deterministically. The context manager is one-shot; `aclose()` closes only clients the Api created - a `client=` passed in is the caller's to close (httpx convention).
+- httpx2 `AsyncClient` is the only HTTP transport; the client should be usable as an async context manager (`async with aiopynautobot.api(...) as nb:`) so the connection pool is closed deterministically. The context manager is one-shot; `aclose()` closes only clients the Api created - a `client=` passed in is the caller's to close (httpx convention).
 - No sync wrapper/facade unless explicitly requested.
 - Fully type-annotated, `from __future__ import annotations` everywhere, ships `py.typed`.
-- Tests run against an in-memory fake behind `httpx.MockTransport` - no network, no mocking library.
+- Tests run against an in-memory fake behind `httpx2.MockTransport` - no network, no mocking library.
 - Never vendor pynautobot or pynetbox code without carrying its Apache 2.0 header and updating [NOTICE](NOTICE).

@@ -4,7 +4,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/challey74/aiopynautobot/blob/main/LICENSE)
 
 Fully async Nautobot API client for Python, built on
-[httpx](https://www.python-httpx.org/).
+[httpx2](https://github.com/pydantic/httpx2) (Pydantic's maintained
+continuation of httpx).
 
 Inspired by [pynautobot](https://github.com/nautobot/pynautobot), redesigned
 for asyncio, and a sister project to
@@ -71,7 +72,7 @@ that isn't loaded raises `AttributeError` telling you to
 
 ## Features
 
-- **Explicit async everywhere**: `httpx.AsyncClient` under the hood, used as
+- **Explicit async everywhere**: `httpx2.AsyncClient` under the hood, used as
   an async context manager so the connection pool closes deterministically.
 - **Concurrent pagination**: after the first page reveals the count, the
   remaining pages are fetched in parallel (bounded by `max_concurrency`,
@@ -182,25 +183,25 @@ One shared instance is safe under concurrent requests. See
 [examples/fastapi_app.py](https://github.com/challey74/aiopynautobot/blob/main/examples/fastapi_app.py)
 for a runnable app.
 
-### Custom httpx client
+### Custom httpx2 client
 
-Pass your own `httpx.AsyncClient` for custom SSL, proxies, event hooks, or
+Pass your own `httpx2.AsyncClient` for custom SSL, proxies, event hooks, or
 `MockTransport` in tests:
 
 ```python
-client = httpx.AsyncClient(verify="/path/to/ca.pem", timeout=60)
+client = httpx2.AsyncClient(verify="/path/to/ca.pem", timeout=60)
 async with aiopynautobot.api(url, token=token, client=client) as nb:
     ...
 ```
 
-Per httpx convention, a client you pass in is yours to close: `aclose()`
+Per httpx2 convention, a client you pass in is yours to close: `aclose()`
 and the context manager only close clients the Api created itself, so
 one client can safely back several Api instances.
 
 Response caching is deliberately not built in: Nautobot is a source of
 truth, and the library can't know your staleness tolerance. If you want
-HTTP caching, pass a client using [hishel](https://hishel.com/)'s
-`AsyncCacheTransport` and set the policy yourself.
+HTTP caching, pass a client with a caching transport and set the policy
+yourself.
 
 ## Development
 

@@ -38,7 +38,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-import httpx
+import httpx2
 
 DEFAULT_URL = "https://demo.nautobot.com/api/swagger.json"
 # The demo instance's documented public read-only token. Nautobot requires
@@ -256,7 +256,7 @@ def main() -> None:
     url = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_URL
     token = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_TOKEN
     headers = {"Accept": "application/json", "Authorization": f"Token {token}"}
-    resp = httpx.get(url, headers=headers, follow_redirects=True, timeout=300)
+    resp = httpx2.get(url, headers=headers, follow_redirects=True, timeout=300)
     resp.raise_for_status()
     spec = resp.json()
     components = spec.get("components", {}).get("schemas", {})
