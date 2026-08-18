@@ -295,8 +295,13 @@ def main() -> None:
         "APP_CLASSES: dict[str, type[App]] = {\n" + "\n".join(mapping) + "\n}"
     )
 
-    (SRC / "apps_generated.py").write_text("\n\n\n".join(apps_chunks) + "\n")
-    (SRC / "hints_generated.pyi").write_text("\n\n\n".join(hints_chunks) + "\n")
+    # newline= keeps the output LF on Windows; the repo stores LF only.
+    (SRC / "apps_generated.py").write_text(
+        "\n\n\n".join(apps_chunks) + "\n", newline="\n"
+    )
+    (SRC / "hints_generated.pyi").write_text(
+        "\n\n\n".join(hints_chunks) + "\n", newline="\n"
+    )
     total = sum(len(v) for v in apps.values())
     params = sum(len(f) for v in apps.values() for f, _ in v.values())
     print(
