@@ -1,6 +1,8 @@
 # aiopynautobot
 
 [![CI](https://github.com/challey74/aiopynautobot/actions/workflows/ci.yml/badge.svg)](https://github.com/challey74/aiopynautobot/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/aiopynautobot)](https://pypi.org/project/aiopynautobot/)
+[![Python versions](https://img.shields.io/pypi/pyversions/aiopynautobot)](https://pypi.org/project/aiopynautobot/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/challey74/aiopynautobot/blob/main/LICENSE)
 
 Fully async Nautobot API client for Python, built on
