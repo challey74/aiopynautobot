@@ -1,4 +1,4 @@
-﻿name: Regenerate endpoints
+name: Regenerate endpoints
 
 on:
   schedule:
@@ -13,7 +13,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: astral-sh/setup-uv@v10.1.0
       - run: uv sync --frozen
       - run: uv run python scripts/generate_endpoints.py
       - run: uv run ruff format src/aiopynautobot/apps_generated.py src/aiopynautobot/hints_generated.pyi
