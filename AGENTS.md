@@ -20,7 +20,7 @@ idiom rather than inventing new ones, and port fixes between the two.
 
 Package layout: `src/aiopynautobot/`, tests in `tests/`. Managed with `uv`.
 
-**Status: 0.2.0, feature-complete against pynautobot.** [PLAN.md](PLAN.md)
+**Status: 0.2.1, feature-complete against pynautobot.** [PLAN.md](PLAN.md)
 tracks the phases; all of them are done, and the decisions they resolved are
 recorded at the bottom of that file.
 

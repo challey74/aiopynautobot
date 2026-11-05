@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-05
+
+### Changed
+
+- Endpoint hints regenerated from Nautobot 3.2.8 (previously 3.2.2): new
+  filter-param hints such as `q` and `is_multi_connector`, and create-field
+  hints updated to match the current schema. Hints only; runtime behavior
+  is unchanged.
+
 ## [0.2.0] - 2026-08-15
 
 ### Changed
@@ -91,6 +100,7 @@ Initial release. Requires Nautobot 2.4+.
 - A runnable FastAPI example (`examples/fastapi_app.py`) showing the
   app-state / lifespan usage pattern.
 
-[unreleased]: https://github.com/challey74/aiopynautobot/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/challey74/aiopynautobot/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/challey74/aiopynautobot/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/challey74/aiopynautobot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/challey74/aiopynautobot/releases/tag/v0.1.0
