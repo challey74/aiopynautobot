@@ -125,7 +125,10 @@ and [hints_generated.pyi](src/aiopynautobot/hints_generated.pyi) - both GENERATE
 by `scripts/generate_endpoints.py` from demo.nautobot.com's OpenAPI schema
 (the demo's documented read-only token is the script's default, since Nautobot
 authenticates every route), never edited by hand; a weekly workflow
-(regenerate-endpoints.yml) opens a PR on drift. The per-app subclasses hold bare
+(regenerate-endpoints.yml) opens a PR on drift, then dispatches ci.yml onto
+the PR branch, because a PR opened with `GITHUB_TOKEN` never triggers
+`pull_request` workflows and branch protection requires the `test (3.x)`
+checks. That is what ci.yml's `workflow_dispatch` trigger is for. The per-app subclasses hold bare
 class annotations (static analysis only, no runtime attributes); `App.__getattr__`
 remains the real mechanism, so unlisted endpoints still work. hints_generated.pyi
 is stub-only (never imported at runtime, hence pyright's reportMissingModuleSource
